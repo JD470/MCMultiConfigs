@@ -1,28 +1,22 @@
-use std::{fs::{self, File}, io::{self, Write, Read}, path::{Path, PathBuf}, ops::Deref};
+use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}};
 
 use ansi_term::{Color};
-use json::{object, JsonValue};
 
 fn config_file_exists(path: String) -> bool{
 	return Path::new(&(path + "\\configs.json")).exists()
 }
 
-fn create_config_file(path: String) -> JsonValue{
-	let json_template = object! {
-		current_config: ""
-	};
+fn create_config_file(path: String){
 	if !config_file_exists(path.clone()){
-		let mut file = File::create(path + "\\configs.json").unwrap();
-		file.write_all(json_template.to_string().as_bytes()).unwrap();
+		File::create(path + "\\configs.json").unwrap();
 	}
-	json_template
 }
 
 fn get_current_config(path: &str) -> String{
-	let mut config_file = File::open(&(path.to_string() + "\\configs.json")).unwrap();
+	let mut config_file = File::open(path.to_string() + "\\configs.json").unwrap();
 	let mut buffer = String::new();
 	config_file.read_to_string(&mut buffer).unwrap();
-	json::parse(&buffer).unwrap()["current_config"].clone().to_string()
+	buffer
 }
 
 fn get_all_configs(path: &str) -> Vec<String>{
@@ -35,7 +29,7 @@ fn get_all_configs(path: &str) -> Vec<String>{
 fn get_all_mod_files_in_dir(path: &str) -> Vec<String>{
 	fs::read_dir(path).unwrap()
 		.filter(|file|	file.as_ref().unwrap().path().is_file() &&
-													file.as_ref().unwrap().path().to_str().unwrap().ends_with(".jar"))
+		file.as_ref().unwrap().path().to_str().unwrap().ends_with(".jar"))
 		.map(|file| file.unwrap().path().to_str().unwrap().to_string())
 		.collect()
 }
@@ -47,7 +41,7 @@ fn get_name_of_dir_or_file(path: &str) -> String{
 fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 	let current_mods = get_all_mod_files_in_dir(path);
 	
-	if current_config != ""{
+	if !current_config.is_empty(){ // Pushes all the mods in the used config into the config's folder
 		for file in current_mods {
 			let temp_path = Path::new(&file);
 			let temp_name = temp_path.file_name().unwrap();
@@ -79,17 +73,27 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 	current_config.push_str(next_config);
 }
 
-fn main() {
+fn update_config_file(path: &str, current_config: &String){
+	fs::write(path.to_string() + "\\configs.json", current_config).unwrap();
+}
+
+#[cfg(target_os = "windows")]
+fn initialize_vt100(){
 	output_vt100::init();
+}
+
+fn main() {
+	initialize_vt100();
 	let mods_path = include_str!("../mods_path.txt");
-
-	let mut json_template = create_config_file(mods_path.to_string());
-
+	
+	create_config_file(mods_path.to_string());
+	
 	let configurations: Vec<String> = get_all_configs(mods_path);
 
 	let mut current_config = get_current_config(mods_path);
 
-	println!("Current configuration: {}\n", if current_config != "" {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
+
+	println!("Current configuration: {}\n", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
 
 	println!("Configurations:");
 	let mut config_counter = 1;
@@ -97,7 +101,7 @@ fn main() {
 		println!("\t{} {}", Color::RGB(125, 125, 125).paint(format!("({config_counter})")), Color::Cyan.underline().paint(get_name_of_dir_or_file(&i)));
 		config_counter += 1;
 	}
-	println!("");
+	println!();
 
 	loop{
 		let mut input: String = String::new();
@@ -118,16 +122,16 @@ fn main() {
 				else{
 					let temp = first_arg.unwrap();
 					swap_configs(&mut current_config, mods_path, &configurations[(temp-1) as usize]);
-					json_template["current_config"] = JsonValue::String(current_config.clone());
-					println!("Current configuration: {}", if current_config != "" {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
+					println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
 				}
+			}
+			else{
+				println!("{}", Color::Red.underline().paint("There needs to be two arguments!"))
 			}
 		}
 	}
-	fs::write(mods_path.to_string() + "\\configs.json", json_template.to_string()).unwrap();
+	update_config_file(mods_path, &current_config);
 }
-
-
 
 fn get_input(buffer: &mut String) -> String {
 	io::stdin().read_line(buffer).unwrap();
