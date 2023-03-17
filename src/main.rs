@@ -1,6 +1,6 @@
 use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}};
 
-use ansi_term::{Color};
+use ansi_term::Color;
 
 fn config_file_exists(path: String) -> bool{
 	return Path::new(&(path + "\\configs.json")).exists()
@@ -61,7 +61,7 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 	let next_config_mods = get_all_mod_files_in_dir(mod_folder.to_str().unwrap());
 
 	
-	for file in next_config_mods{
+	for file in next_config_mods{ // Pushes all the mods of the desired config into the mod folder
 		let temp_path = Path::new(&file);
 		let temp_name = temp_path.file_name().unwrap();
 		let mut destination = PathBuf::from(path);
@@ -93,7 +93,14 @@ fn main() {
 	let mut current_config = get_current_config(mods_path);
 
 
-	println!("Current configuration: {}\n", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
+	println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
+
+	println!();
+
+	println!("Commands:\n\t{}\n\t{}", 	Color::RGB(165, 165, 165).paint("exit Exits the program."), 
+						Color::RGB(165, 165, 165).paint("swap <number> Swaps current config with the config corresponding to the config."));
+
+	println!();
 
 	println!("Configurations:");
 	let mut config_counter = 1;
