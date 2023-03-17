@@ -1,4 +1,4 @@
-use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}};
+use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError};
 
 use ansi_term::Color;
 
@@ -52,15 +52,16 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 			fs::rename(temp_path.to_str().unwrap(), destination.to_str().unwrap()).unwrap();
 		}
 	}
+
 	if current_config == next_config{
 		current_config.clear();
 		return;
 	}
+
 	let mut mod_folder = PathBuf::from(path);
 	mod_folder.push(next_config);
 	let next_config_mods = get_all_mod_files_in_dir(mod_folder.to_str().unwrap());
 
-	
 	for file in next_config_mods{ // Pushes all the mods of the desired config into the mod folder
 		let temp_path = Path::new(&file);
 		let temp_name = temp_path.file_name().unwrap();
@@ -69,6 +70,7 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 
 		fs::rename(temp_path.to_str().unwrap(), destination.to_str().unwrap()).unwrap();
 	}
+
 	current_config.clear();
 	current_config.push_str(next_config);
 }
@@ -108,6 +110,7 @@ fn main() {
 		println!("\t{} {}", Color::RGB(125, 125, 125).paint(format!("({config_counter})")), Color::Cyan.underline().paint(get_name_of_dir_or_file(&i)));
 		config_counter += 1;
 	}
+
 	println!();
 
 	loop{
@@ -121,19 +124,23 @@ fn main() {
 
 		if command == "swap"{
 			let number = input.split(' ').collect::<Vec<&str>>();
+			let first_arg: Result<i16, ParseIntError>;
+			
 			if number.len() == 2 {
-				let first_arg = number[1].parse::<i32>();
-				if first_arg.is_err() {
-					println!("{}", Color::Red.underline().paint("First argument: This is not a number"));
-				}
-				else{
-					let temp = first_arg.unwrap();
-					swap_configs(&mut current_config, mods_path, &configurations[(temp-1) as usize]);
-					println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
-				}
+				first_arg = number[1].parse();
 			}
 			else{
-				println!("{}", Color::Red.underline().paint("There needs to be two arguments!"))
+				println!("{}", Color::Red.underline().paint("There needs to be two arguments!"));
+				continue;
+			}
+
+			if !first_arg.is_err() {
+				let temp = first_arg.unwrap();
+				swap_configs(&mut current_config, mods_path, &configurations[(temp-1) as usize]);
+				println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
+			}
+			else{
+				println!("{}", Color::Red.underline().paint("First argument: This is not a number"));
 			}
 		}
 	}
