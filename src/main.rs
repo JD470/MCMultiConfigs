@@ -1,5 +1,6 @@
 use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError};
 
+#[cfg(target_os = "windows")]
 use ansi_term::Color;
 
 fn config_file_exists(path: String) -> bool{
@@ -134,9 +135,9 @@ fn main() {
 				continue;
 			}
 
-			if !first_arg.is_err() {
-				let temp = first_arg.unwrap();
-				swap_configs(&mut current_config, mods_path, &configurations[(temp-1) as usize]);
+			if first_arg.is_ok() {
+				let first_arg_ok = first_arg.unwrap();
+				swap_configs(&mut current_config, mods_path, &configurations[(first_arg_ok-1) as usize]);
 				println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
 			}
 			else{
