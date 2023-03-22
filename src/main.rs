@@ -1,6 +1,5 @@
 use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError};
 
-#[cfg(target_os = "windows")]
 use ansi_term::Color;
 
 fn config_file_exists(path: String) -> bool{
@@ -86,7 +85,12 @@ fn initialize_vt100(){
 }
 
 fn main() {
-	initialize_vt100();
+	cfg_if::cfg_if! {
+		if #[cfg(target_os = "windows")] {
+			initialize_vt100();
+		}
+	}
+	
 	let mods_path = include_str!("../mods_path.txt");
 	
 	create_config_file(mods_path.to_string());
