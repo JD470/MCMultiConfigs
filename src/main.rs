@@ -1,4 +1,4 @@
-use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError};
+use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError, sync::{Arc, Mutex}, process::exit};
 
 use ansi_term::Color;
 
@@ -84,6 +84,11 @@ fn initialize_vt100(){
 	output_vt100::init();
 }
 
+const IN_PARENTHESIS: Color = Color::RGB(125, 125, 125);
+const NORMAL_TEXT: Color = Color::RGB(165, 165, 165);
+const CONFIGURATION_COLOR: Color = Color::Cyan;
+const ERROR: Color = Color::Red;
+
 fn main() {
 	cfg_if::cfg_if! {
 		if #[cfg(target_os = "windows")] {
@@ -96,25 +101,33 @@ fn main() {
 	create_config_file(mods_path.to_string());
 	
 	let configurations: Vec<String> = get_all_configs(mods_path);
+	
+	let cur_conf = Arc::new(Mutex::new(get_current_config(mods_path)));
+	let current_config = cur_conf.clone();
+	
+	ctrlc::set_handler(move || { // Handling user exiting program unproperly
+		let temp = cur_conf.lock().unwrap();
 
-	let mut current_config = get_current_config(mods_path);
+		update_config_file(mods_path, &temp);
+		exit(0);
+	}).unwrap();
 
-
-	println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
+	println!("Current configuration: {}", if !current_config.lock().unwrap().is_empty() {get_name_of_dir_or_file(&current_config.lock().unwrap())} else {"none".to_string()});
 
 	println!();
 
-	println!("Commands:\n\t{}\n\t{}", 	Color::RGB(165, 165, 165).paint("exit Exits the program."), 
-						Color::RGB(165, 165, 165).paint("swap <number> Swaps current config with the config corresponding to the config."));
+	println!("Commands:\n\t{}\n\t{}\n\t{}",
+				NORMAL_TEXT.paint("exit Exits the program."), 
+				IN_PARENTHESIS.paint("(Can also Ctrl+C or end the terminal without messing things up if you already swapped the config)"),
+				NORMAL_TEXT.paint("swap <number> Swaps current config with the config corresponding to the config."));
 
 	println!();
 
 	println!("Configurations:");
-	let mut config_counter = 1;
-	for i in configurations.clone(){
-		println!("\t{} {}", Color::RGB(125, 125, 125).paint(format!("({config_counter})")), Color::Cyan.underline().paint(get_name_of_dir_or_file(&i)));
-		config_counter += 1;
-	}
+	
+	configurations.clone().iter().enumerate().map(|(index, value)| {
+		println!("\t{} {}", IN_PARENTHESIS.paint(format!("({})", index+1)), CONFIGURATION_COLOR.underline().paint(get_name_of_dir_or_file(&value)));
+	}).for_each(drop);
 
 	println!();
 
@@ -135,21 +148,21 @@ fn main() {
 				first_arg = number[1].parse();
 			}
 			else{
-				println!("{}", Color::Red.underline().paint("There needs to be two arguments!"));
+				println!("{}", ERROR.underline().paint("There needs to be two arguments!"));
 				continue;
 			}
 
 			if first_arg.is_ok() {
 				let first_arg_ok = first_arg.unwrap();
-				swap_configs(&mut current_config, mods_path, &configurations[(first_arg_ok-1) as usize]);
-				println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
+				swap_configs(&mut current_config.lock().unwrap(), mods_path, &configurations[(first_arg_ok-1) as usize]);
+				println!("Current configuration: {}", if !current_config.lock().unwrap().is_empty() {get_name_of_dir_or_file(&current_config.clone().lock().unwrap())} else {"none".to_string()});
 			}
 			else{
-				println!("{}", Color::Red.underline().paint("First argument: This is not a number"));
+				println!("{}", ERROR.underline().paint("First argument: This is not a number"));
 			}
 		}
 	}
-	update_config_file(mods_path, &current_config);
+	update_config_file(mods_path, &current_config.lock().unwrap());
 }
 
 fn get_input(buffer: &mut String) -> String {
