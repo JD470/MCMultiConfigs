@@ -1,4 +1,4 @@
-use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError, sync::{Arc, Mutex}, process::exit};
+use std::{fs::{self, File}, io::{self, Read}, path::{Path, PathBuf}, num::ParseIntError, process::exit};
 
 use ansi_term::Color;
 
@@ -55,6 +55,7 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 
 	if current_config == next_config{
 		current_config.clear();
+		update_config_file(path, &current_config);
 		return;
 	}
 
@@ -73,10 +74,15 @@ fn swap_configs(current_config: &mut String, path: &str, next_config: &str) {
 
 	current_config.clear();
 	current_config.push_str(next_config);
+	update_config_file(path, &current_config);
 }
 
 fn update_config_file(path: &str, current_config: &String){
 	fs::write(path.to_string() + "\\configs.json", current_config).unwrap();
+	if current_config.is_empty(){
+		let file = File::create(path.to_string() + "\\configs.json").unwrap();
+		file.set_len(0).unwrap();
+	}
 }
 
 #[cfg(target_os = "windows")]
@@ -95,6 +101,10 @@ fn main() {
 			initialize_vt100();
 		}
 	}
+
+	ctrlc::set_handler(||{
+		exit(0);
+	}).unwrap();
 	
 	let mods_path = include_str!("../mods_path.txt");
 	
@@ -102,17 +112,9 @@ fn main() {
 	
 	let configurations: Vec<String> = get_all_configs(mods_path);
 	
-	let cur_conf = Arc::new(Mutex::new(get_current_config(mods_path)));
-	let current_config = cur_conf.clone();
-	
-	ctrlc::set_handler(move || { // Handling user exiting program unproperly
-		let temp = cur_conf.lock().unwrap();
+	let mut current_config = get_current_config(mods_path);
 
-		update_config_file(mods_path, &temp);
-		exit(0);
-	}).unwrap();
-
-	println!("Current configuration: {}", if !current_config.lock().unwrap().is_empty() {get_name_of_dir_or_file(&current_config.lock().unwrap())} else {"none".to_string()});
+	println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config)} else {"none".to_string()});
 
 	println!();
 
@@ -154,15 +156,15 @@ fn main() {
 
 			if first_arg.is_ok() {
 				let first_arg_ok = first_arg.unwrap();
-				swap_configs(&mut current_config.lock().unwrap(), mods_path, &configurations[(first_arg_ok-1) as usize]);
-				println!("Current configuration: {}", if !current_config.lock().unwrap().is_empty() {get_name_of_dir_or_file(&current_config.clone().lock().unwrap())} else {"none".to_string()});
+				swap_configs(&mut current_config, mods_path, &configurations[(first_arg_ok-1) as usize]);
+				println!("Current configuration: {}", if !current_config.is_empty() {get_name_of_dir_or_file(&current_config.clone())} else {"none".to_string()});
 			}
 			else{
 				println!("{}", ERROR.underline().paint("First argument: This is not a number"));
 			}
 		}
 	}
-	update_config_file(mods_path, &current_config.lock().unwrap());
+	update_config_file(mods_path, &current_config);
 }
 
 fn get_input(buffer: &mut String) -> String {
